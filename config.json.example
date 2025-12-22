@@ -1,0 +1,18 @@
+{
+    "mqtt": {
+        "broker": "192.168.1.7",
+        "port": 1883,
+        "username": "",
+        "password": ""
+    },
+    "files": {
+        "sub_directory": "../tx_files",
+        "node_id": "catflap",
+        "discovery_prefix": "homeassistant"
+    },
+    "device_info": {
+        "hub_name": "CatFlap",
+        "manufacturer": "CatFlap",
+        "model": "RF Remote"
+    }
+}

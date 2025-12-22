@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+.env
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+tx_files/*
+!tx_files/.gitkeep
+
+# Home Assistant / add-on runtime artifacts
+src/config.json
+src/.discovery_cache.json
+src/__pycache__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Optional local scripts (uncomment if you truly want them ignored)
+deploy.sh
+nuke.sh
+
+rfcat/build/
+rfcat/*.egg-info/
