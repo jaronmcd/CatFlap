@@ -1,5 +1,5 @@
 name: "CatFlap"
-version: "0.9.6"
+version: "0.9.5"
 slug: "catflap"
 description: >-
   Replay Flipper Zero .sub (RAW) and .rfcat.json captures as Home Assistant MQTT buttons,
@@ -29,9 +29,9 @@ options:
   mqtt_user: ""
   mqtt_password: ""
   node_id: "catflap"
-  discovery_prefix: "homeassistant"
+  #discovery_prefix: "homeassistant"
   sub_directory: "/share/tx_files"
-  log_level: "info"
+  #log_level: "info"
 
 schema:
   mqtt_broker: str
@@ -39,6 +39,6 @@ schema:
   mqtt_user: str
   mqtt_password: password
   node_id: str
-  discovery_prefix: str
+  #discovery_prefix: str
   sub_directory: str
-  log_level: list(debug|info|warning|error)
+  #log_level: list(debug|info|warning|error)
