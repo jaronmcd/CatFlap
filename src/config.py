@@ -15,6 +15,9 @@ def load_config():
 
     with open(config_path, 'r') as f:
         config = json.load(f)
+        
+    config.setdefault("rf", {})
+    config["rf"].setdefault("tx_power", "max")
 
     # Normalize the sub_directory path
     raw_sub = config['files'].get('sub_directory', './sub_files')

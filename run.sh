@@ -3,14 +3,33 @@ set -euo pipefail
 
 bashio::log.info "Starting CatFlap..."
 
+# Add-on version -> used by main.py banner (it will add the leading "v" if needed)
+if bashio::addon.version >/dev/null 2>&1; then
+  export CATFLAP_VERSION="$(bashio::addon.version)"
+fi
+
+# Defaults (keep these internal unless you *want* to expose them again)
+TX_POWER="max"
+PREFIX="homeassistant"
+LOG_LEVEL="info"
+
+# Optional overrides (only if present in add-on config)
+if bashio::config.has_value 'tx_power'; then
+  TX_POWER="$(bashio::config 'tx_power')"
+fi
+if bashio::config.has_value 'discovery_prefix'; then
+  PREFIX="$(bashio::config 'discovery_prefix')"
+fi
+if bashio::config.has_value 'log_level'; then
+  LOG_LEVEL="$(bashio::config 'log_level')"
+fi
+
 MQTT_HOST="$(bashio::config 'mqtt_broker')"
 MQTT_PORT="$(bashio::config 'mqtt_port')"
 MQTT_USER="$(bashio::config 'mqtt_user')"
 MQTT_PASS="$(bashio::config 'mqtt_password')"
 NODE_ID="$(bashio::config 'node_id')"
-PREFIX="$(bashio::config 'discovery_prefix')"
 SUB_DIR="$(bashio::config 'sub_directory')"
-LOG_LEVEL="$(bashio::config 'log_level')"
 
 mkdir -p "${SUB_DIR}"
 
@@ -20,11 +39,12 @@ if [ -n "${MQTT_USER}" ]; then
 else
   bashio::log.info "MQTT: ${MQTT_HOST}:${MQTT_PORT} (no auth)"
 fi
-bashio::log.info "Discovery prefix: ${PREFIX}"
 bashio::log.info "Node ID: ${NODE_ID}"
 bashio::log.info "TX directory: ${SUB_DIR}"
+bashio::log.info "TX power: ${TX_POWER}"
 bashio::log.info "Log level: ${LOG_LEVEL}"
 
+# Generate runtime config for the python app
 cat > /app/src/config.json <<EOF
 {
   "mqtt": {
@@ -42,6 +62,9 @@ cat > /app/src/config.json <<EOF
     "hub_name": "CatFlap",
     "manufacturer": "CatFlap",
     "model": "Gateway"
+  },
+  "rf": {
+    "tx_power": "${TX_POWER}"
   },
   "log_level": "${LOG_LEVEL}"
 }

@@ -268,6 +268,8 @@ def _on_message_factory(state: AppState):
 
         try:
             print(f"[RfCat] Replaying {os.path.basename(file_path)}")
+            rf_cfg = state.config.get("rf", {})
+            tx["tx_power"] = rf_cfg.get("tx_power", "max")
             state.radio.transmit(**tx)
             print("[RfCat] Transmission complete")
         except Exception as e:
