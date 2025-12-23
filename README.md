@@ -29,19 +29,21 @@ You are responsible for complying with **all applicable laws and regulations**. 
   - Flipper Zero Sub-GHz **`.sub`** files with `RAW_Data`
   - **`.rfcat.json`** for explicit RFCat/rflib settings + payload
 - **Retained discovery + cleanup:** Removed files are removed from Home Assistant automatically (stale discovery topics are deleted).
+- **Bridge Status entity:** Publishes a “Bridge Status” binary sensor to show when the add-on is running.
+
 
 ---
 
 ## How it works
 
-```mermaid
-flowchart LR
-  A[/share/tx_files/] --> B[CatFlap add-on]
-  B -->|MQTT Discovery| C[Home Assistant]
-  C -->|Button press: PRESS| B
-  B -->|Transmit| D[RFCat / rflib]
-  D --> E((RF))
-```
+1) CatFlap scans `sub_directory` for supported files (`.sub`, `.rfcat.json`).
+
+2) For each replay file, CatFlap publishes a Home Assistant **MQTT Discovery “button”** with a `command_topic`.
+
+3) When you press a button in Home Assistant, HA publishes `PRESS` to that topic.
+
+4) CatFlap receives the `PRESS`, parses the file, configures RFCat modem settings, and transmits the replay via CC1111.
+
 
 ---
 
@@ -97,20 +99,12 @@ In the add-on UI you’ll set:
 - `mqtt_broker` (e.g. `core-mosquitto` or an IP)
 - `mqtt_port` (default `1883`)
 - `mqtt_user` / `mqtt_password`
-- `node_id` (default `catflap`)
+- `node_id` (default `catflap`) — becomes the base MQTT topic (e.g. `catflap/...`)
 - `sub_directory` (default `/share/tx_files`)
-- `tx_power` (default `max`) — controls the CC1111 transmit power for **all** replays:
-  - `max`: call `rflib`’s `setMaxPower()` before transmitting
-  - `default`: **do not** change any PA/power registers (uses whatever the dongle firmware/rflib currently has set)
-  - a number like `8` or `0x08`: pass that value through to `rflib` as a **PA_TABLE byte** (details below)
-
-Advanced (not exposed by default in `config.yaml`, but supported by the runtime config):
-
-- `discovery_prefix` (default `homeassistant`)
-- `log_level` (default `info`)
-
-CatFlap writes these into `src/config.json` inside the container and runs `src/main.py`.
-
+- `tx_power` (default `max`) — CC1111 transmit power for **all** replays:
+  - `max` (or empty): call RFCat `setMaxPower()` before transmitting
+  - `default` / `auto`: don’t change power registers (use the dongle’s current setting)
+  - a number like `8` or `0x08`: call RFCat `setPower(<value>)` / `setTxPower(<value>)`
 ### TX power: what the number means
 
 CatFlap does **not** treat `tx_power` as “dBm”. It’s a low-level **PA table register value** that the CC1111 uses to set its output stage drive.
