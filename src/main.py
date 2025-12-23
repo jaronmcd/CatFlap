@@ -270,8 +270,12 @@ def _on_message_factory(state: AppState):
             print(f"[RfCat] Replaying {os.path.basename(file_path)}")
             rf_cfg = state.config.get("rf", {})
 
-            # New CC1110/CC1111 power configuration (no backwards compatibility)
-            tx["tx_power_mode"] = rf_cfg.get("tx_power_mode", "max")
+            # New human-friendly TX power config
+            tx["tx_power_mode"] = rf_cfg.get("tx_power_mode", "smart")
+            tx["tx_power_target_dbm"] = rf_cfg.get("tx_power_target_dbm", 0)
+            tx["tx_power_band"] = rf_cfg.get("tx_power_band", "auto")
+
+            # Advanced/manual escape hatches
             tx["frend0_pa_power"] = rf_cfg.get("frend0_pa_power")
             tx["frend0_lodiv_buf_current_tx"] = rf_cfg.get("frend0_lodiv_buf_current_tx")
             tx["patable"] = rf_cfg.get("patable")

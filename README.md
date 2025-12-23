@@ -107,32 +107,62 @@ In the add-on UI you’ll set:
   - a number like `8` or `0x08`: call RFCat `setPower(<value>)` / `setTxPower(<value>)`
 ### TX power: what the number means
 
-CatFlap does **not** treat `tx_power` as “dBm”. It’s a low-level **PA table register value** that the CC1111 uses to set its output stage drive.
+CatFlap supports four transmit-power modes:
 
-- For **ASK/OOK**, the CC1111 uses `PA_TABLE0` and `PA_TABLE1` as the logic-0 / logic-1 power settings, respectively.  
-  CatFlap (via `rflib`) sets `PA_TABLE0 = 0x00` and `PA_TABLE1 = <your tx_power>` so the “high” portions of OOK use your chosen value.
-- For non-OOK modulations, it uses a single PA setting (`PA_TABLE0 = <your tx_power>`).
+- `tx_power_mode: smart` (default) — **band + target dBm → PATABLE code** using the TI reference table below
+- `tx_power_mode: max` — calls rflib `setMaxPower()` (quick “just make it work” option)
+- `tx_power_mode: default` — leaves the dongle’s current power configuration untouched
+- `tx_power_mode: manual` — programs **FREND0** + **PATABLE** directly (advanced)
 
-Recommended starting points (typical) are published by TI for CC1110/CC1111 (see **Table 72** in the CC1110/CC1111 datasheet): https://www.ti.com/lit/ds/symlink/cc1110-cc1111.pdf
+#### Smart mode (recommended)
 
-| Target output (dBm) | 315 MHz | 433 MHz | 868 MHz | 915 MHz | Decimal (315/433/868/915) |
-|---:|:---:|:---:|:---:|:---:|:---:|
-| -30 | `0x12` | `0x12` | `0x03` | `0x03` | `18 / 18 / 3 / 3` |
-| -20 | `0x0D` | `0x0E` | `0x0E` | `0x0D` | `13 / 14 / 14 / 13` |
-| -15 | `0x1C` | `0x1D` | `0x1E` | `0x1D` | `28 / 29 / 30 / 29` |
-| -10 | `0x34` | `0x34` | `0x27` | `0x26` | `52 / 52 / 39 / 38` |
-| -5  | `0x2B` | `0x2C` | `0x8F` | `0x57` | `43 / 44 / 143 / 87` |
-| 0   | `0x51` | `0x60` | `0x50` | `0x8E` | `81 / 96 / 80 / 142` |
-| 5   | `0x85` | `0x84` | `0x84` | `0x83` | `133 / 132 / 132 / 131` |
-| 7   | `0xCB` | `0xC8` | `0xCB` | `0xC7` | `203 / 200 / 203 / 199` |
-| 10  | `0xC2` | `0xC0` | `0xC2` | `0xC0` | `194 / 192 / 194 / 192` |
+Smart mode is the “human readable” interface:
 
+- `tx_power_target_dbm` picks a target output level from the TI table
+- `tx_power_band: auto` infers the band bucket (315/433/868/915) from the replay file’s TX frequency
+
+Example:
+
+    tx_power_mode: smart
+    tx_power_target_dbm: 0
+    tx_power_band: auto
+
+Lookup table (hex value with decimal in parentheses):
+
+| Target output (dBm) | 315 MHz | 433 MHz | 868 MHz | 915 MHz |
+|---:|:---:|:---:|:---:|:---:|
+| -30 | `0x12` (18) | `0x12` (18) | `0x03` (3) | `0x03` (3) |
+| -20 | `0x0D` (13) | `0x0E` (14) | `0x0E` (14) | `0x0D` (13) |
+| -15 | `0x1C` (28) | `0x1D` (29) | `0x1E` (30) | `0x1D` (29) |
+| -10 | `0x34` (52) | `0x34` (52) | `0x27` (39) | `0x26` (38) |
+|  -5 | `0x2B` (43) | `0x2C` (44) | `0x8F` (143) | `0x57` (87) |
+|   0 | `0x51` (81) | `0x60` (96) | `0x50` (80) | `0x8E` (142) |
+|   5 | `0x85` (133) | `0x84` (132) | `0x84` (132) | `0x83` (131) |
+|   7 | `0xCB` (203) | `0xC8` (200) | `0xCB` (203) | `0xC7` (199) |
+|  10 | `0xC2` (194) | `0xC0` (192) | `0xC2` (194) | `0xC0` (192) |
 
 Notes:
 
-- Output power vs `PA_TABLE` value is **not linear**.
-- Some PA settings are discouraged/invalid (for CC1111, TI notes `0x68`–`0x6F` is not recommended).
-- Your *radiated* power depends heavily on antenna, matching, band, and board layout — treat the table as “starting points”, not a calibrated RF power meter reading.
+- Output power is **approximate**: real dBm depends on band, matching network, antenna, board layout, and supply voltage.
+- Some PA settings are discouraged/invalid on certain boards; treat the table as **starting points**, not a calibrated RF power meter.
+
+#### Manual mode (FREND0 + PATABLE)
+
+Manual mode exposes the CC111x fields that drive TX output:
+
+- `frend0_pa_power` (0–7): sets **FREND0.PA_POWER[2:0]** (selects the PATABLE index used for TX power)
+- `frend0_lodiv_buf_current_tx` (0–3): sets **FREND0.LODIV_BUF_CURRENT_TX[1:0]** (TX LO buffer current)
+- `patable`: sets **PA_TABLE0..7** (PA shaping/ramp and output level codes)
+
+How CatFlap treats `patable`:
+
+- A single value like `"0xC0"` is treated as a convenience “ON level”
+  - For **ASK/OOK**, CatFlap forces `PA_TABLE0 = 0x00` and fills indices `1..PA_POWER` with the ON value
+  - For **FSK/GFSK/MSK**, CatFlap fills indices `0..PA_POWER` with the ON value
+- A comma list (up to 8 values) defines an explicit shaping/ramp table
+
+---
+
 
 ---
 

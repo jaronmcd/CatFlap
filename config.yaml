@@ -1,5 +1,5 @@
 name: "CatFlap"
-version: "0.9.7 ALPHA"
+version: "0.9.7-alpha"
 slug: "catflap"
 description: >-
   Replay Flipper Zero .sub (RAW) and .rfcat.json captures as Home Assistant MQTT buttons,
@@ -15,11 +15,9 @@ startup: application
 boot: auto
 init: false
 
-# Needed so you can manage files in /share
 map:
   - share:rw
 
-# Needed for CC1111 USB dongles
 usb: true
 udev: true
 
@@ -28,26 +26,49 @@ options:
   mqtt_port: 1883
   mqtt_user: ""
   mqtt_password: ""
+
   node_id: "catflap"
   sub_directory: "/share/tx_files"
 
-  # CC1110/CC1111 TX power configuration (SWRS033H)
-  # - tx_power_mode: "max" uses rfcat defaults (recommended starting point)
-  # - "manual" programs FREND0 + PATABLE using firmware peek/poke
-  tx_power_mode: "max"
-  frend0_pa_power: null
-  frend0_lodiv_buf_current_tx: null
-  patable: null
+  # -----------------------------
+  # TX power (simple / recommended)
+  # -----------------------------
+  # smart   = uses TI table (freq -> band) + (target dBm -> PATABLE code)
+  # max     = rfcat/rflib helper
+  # default = don't touch power registers
+  # manual  = advanced (FREND0 + PATABLE below)
+  tx_power_mode: "smart"
+
+  # Human-friendly table target (dropdown)
+  tx_power_target_dbm: 0
+
+  # auto = infer from replay file TX frequency
+  # or force bucket:
+  tx_power_band: "auto"
+
+  # -----------------------------
+  # Advanced / manual (ignored unless tx_power_mode == "manual")
+  # -----------------------------
+  # IMPORTANT: give a real default so HA doesn't block startup
+  frend0_pa_power: 1
+  frend0_lodiv_buf_current_tx: 0
+  patable: ""
 
 schema:
   mqtt_broker: str
   mqtt_port: port
-  mqtt_user: str
-  mqtt_password: password
+  mqtt_user: str?
+  mqtt_password: password?
+
   node_id: str
   sub_directory: str
 
-  tx_power_mode: str?
-  frend0_pa_power: int?
-  frend0_lodiv_buf_current_tx: int?
+  # Dropdowns (much more intuitive)
+  tx_power_mode: list(smart|max|default|manual)
+  tx_power_target_dbm: list(-30|-20|-15|-10|-5|0|5|7|10)
+  tx_power_band: list(auto|315|433|868|915)
+
+  # Advanced/manual (optional to the user, but we provide defaults above)
+  frend0_pa_power: int
+  frend0_lodiv_buf_current_tx: int
   patable: str?
