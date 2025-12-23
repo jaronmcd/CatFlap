@@ -113,7 +113,7 @@ CatFlap does **not** treat `tx_power` as “dBm”. It’s a low-level **PA tabl
   CatFlap (via `rflib`) sets `PA_TABLE0 = 0x00` and `PA_TABLE1 = <your tx_power>` so the “high” portions of OOK use your chosen value.
 - For non-OOK modulations, it uses a single PA setting (`PA_TABLE0 = <your tx_power>`).
 
-Recommended starting points (typical) are published by TI for CC1110/CC1111 (see **Table 72** in the CC1110/CC1111 datasheet):
+Recommended starting points (typical) are published by TI for CC1110/CC1111 (see **Table 72** in the CC1110/CC1111 datasheet): https://www.ti.com/lit/ds/symlink/cc1110-cc1111.pdf
 
 | Target output (dBm) | 315 MHz | 433 MHz | 868 MHz | 915 MHz |
 |---:|:---:|:---:|:---:|:---:|
