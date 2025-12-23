@@ -90,8 +90,6 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
----
-
 ## ⚙️ Configuration (Home Assistant Add-on)
 
 In the add-on UI you’ll set:
@@ -100,14 +98,46 @@ In the add-on UI you’ll set:
 - `mqtt_port` (default `1883`)
 - `mqtt_user` / `mqtt_password`
 - `node_id` (default `catflap`)
-- `discovery_prefix` (default `homeassistant`)
 - `sub_directory` (default `/share/tx_files`)
+- `tx_power` (default `max`) — controls the CC1111 transmit power for **all** replays:
+  - `max`: call `rflib`’s `setMaxPower()` before transmitting
+  - `default`: **do not** change any PA/power registers (uses whatever the dongle firmware/rflib currently has set)
+  - a number like `8` or `0x08`: pass that value through to `rflib` as a **PA_TABLE byte** (details below)
 
-Optional icon settings:
+Advanced (not exposed by default in `config.yaml`, but supported by the runtime config):
 
-- `device_info.default_entity_icon` (default: `mdi:radio-tower`) — fallback icon for entities when no icon file/keyword match applies.
+- `discovery_prefix` (default `homeassistant`)
+- `log_level` (default `info`)
 
 CatFlap writes these into `src/config.json` inside the container and runs `src/main.py`.
+
+### TX power: what the number means
+
+CatFlap does **not** treat `tx_power` as “dBm”. It’s a low-level **PA table register value** that the CC1111 uses to set its output stage drive.
+
+- For **ASK/OOK**, the CC1111 uses `PA_TABLE0` and `PA_TABLE1` as the logic-0 / logic-1 power settings, respectively.  
+  CatFlap (via `rflib`) sets `PA_TABLE0 = 0x00` and `PA_TABLE1 = <your tx_power>` so the “high” portions of OOK use your chosen value.
+- For non-OOK modulations, it uses a single PA setting (`PA_TABLE0 = <your tx_power>`).
+
+Recommended starting points (typical) are published by TI for CC1110/CC1111 (see **Table 72** in the CC1110/CC1111 datasheet):
+
+| Target output (dBm) | 315 MHz | 433 MHz | 868 MHz | 915 MHz |
+|---:|:---:|:---:|:---:|:---:|
+| -30 | `0x12` | `0x12` | `0x03` | `0x03` |
+| -20 | `0x0D` | `0x0E` | `0x0E` | `0x0D` |
+| -15 | `0x1C` | `0x1D` | `0x1E` | `0x1D` |
+| -10 | `0x34` | `0x34` | `0x27` | `0x26` |
+| -5  | `0x2B` | `0x2C` | `0x8F` | `0x57` |
+| 0   | `0x51` | `0x60` | `0x50` | `0x8E` |
+| 5   | `0x85` | `0x84` | `0x84` | `0x83` |
+| 7   | `0xCB` | `0xC8` | `0xCB` | `0xC7` |
+| 10  | `0xC2` | `0xC0` | `0xC2` | `0xC0` |
+
+Notes:
+
+- Output power vs `PA_TABLE` value is **not linear**.
+- Some PA settings are discouraged/invalid (for CC1111, TI notes `0x68`–`0x6F` is not recommended).
+- Your *radiated* power depends heavily on antenna, matching, band, and board layout — treat the table as “starting points”, not a calibrated RF power meter reading.
 
 ---
 
