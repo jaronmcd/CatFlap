@@ -269,7 +269,13 @@ def _on_message_factory(state: AppState):
         try:
             print(f"[RfCat] Replaying {os.path.basename(file_path)}")
             rf_cfg = state.config.get("rf", {})
-            tx["tx_power"] = rf_cfg.get("tx_power", "max")
+
+            # New CC1110/CC1111 power configuration (no backwards compatibility)
+            tx["tx_power_mode"] = rf_cfg.get("tx_power_mode", "max")
+            tx["frend0_pa_power"] = rf_cfg.get("frend0_pa_power")
+            tx["frend0_lodiv_buf_current_tx"] = rf_cfg.get("frend0_lodiv_buf_current_tx")
+            tx["patable"] = rf_cfg.get("patable")
+
             state.radio.transmit(**tx)
             print("[RfCat] Transmission complete")
         except Exception as e:

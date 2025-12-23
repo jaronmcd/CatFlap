@@ -37,7 +37,6 @@ def test_radio_transmit_calls_rflib(monkeypatch):
         deviation=None,
         syncmode=1,
         preamble=2,
-        max_power=True,
     )
 
     d.setFreq.assert_called_with(433_920_000)

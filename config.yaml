@@ -1,5 +1,5 @@
 name: "CatFlap"
-version: "0.9.6"
+version: "0.9.7 ALPHA"
 slug: "catflap"
 description: >-
   Replay Flipper Zero .sub (RAW) and .rfcat.json captures as Home Assistant MQTT buttons,
@@ -29,8 +29,15 @@ options:
   mqtt_user: ""
   mqtt_password: ""
   node_id: "catflap"
-  tx_power: "max"           # "max", "default", or a number like "8" / "0x08"
   sub_directory: "/share/tx_files"
+
+  # CC1110/CC1111 TX power configuration (SWRS033H)
+  # - tx_power_mode: "max" uses rfcat defaults (recommended starting point)
+  # - "manual" programs FREND0 + PATABLE using firmware peek/poke
+  tx_power_mode: "max"
+  frend0_pa_power: null
+  frend0_lodiv_buf_current_tx: null
+  patable: null
 
 schema:
   mqtt_broker: str
@@ -38,5 +45,9 @@ schema:
   mqtt_user: str
   mqtt_password: password
   node_id: str
-  tx_power: str?
   sub_directory: str
+
+  tx_power_mode: str?
+  frend0_pa_power: int?
+  frend0_lodiv_buf_current_tx: int?
+  patable: str?

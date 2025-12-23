@@ -13,7 +13,9 @@ import re
 #    settings + payload). This is the most reliable way to replay things that
 #    aren't Flipper captures.
 #
-
+# Power configuration is NOT part of per-file formats anymore. Power is controlled
+# globally via config.json (rf.tx_power_mode / FREND0 / PATABLE).
+#
 
 SUPPORTED_EXTENSIONS = (
     ".sub",
@@ -164,7 +166,6 @@ def parse_rfcat_json(path: str):
     syncmode = int(data.get("syncmode", 0))
     preamble = int(data.get("preamble", 0))
     repeat = int(data.get("repeat", 20))
-    max_power = bool(data.get("max_power", True))
 
     # Payload: prefer explicit bytes; fall back to raw durations for OOK.
     payload = None
@@ -204,7 +205,6 @@ def parse_rfcat_json(path: str):
         "deviation": deviation,
         "syncmode": syncmode,
         "preamble": preamble,
-        "max_power": max_power,
     }
 
 
@@ -227,7 +227,6 @@ def get_tx_request(path: str, default_repeat: int = 20, default_drate: int = 333
             "deviation": None,
             "syncmode": 0,
             "preamble": 0,
-            "max_power": True,
         }
     if p.endswith(".rfcat.json"):
         return parse_rfcat_json(path)
