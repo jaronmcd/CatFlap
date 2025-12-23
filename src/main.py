@@ -312,7 +312,15 @@ def run() -> None:
 
     mqtt_cfg = cfg.get("mqtt", {})
     broker = mqtt_cfg.get("broker")
-    port = int(mqtt_cfg.get("port", 1883))
+    port_raw = mqtt_cfg.get("port", 1883)
+    if port_raw in (None, "", "null"):
+        port = 1883
+    else:
+        try:
+            port = int(port_raw)
+        except (TypeError, ValueError):
+            port = 1883
+
     if not broker:
         print("[Config] CRITICAL: mqtt.broker is missing")
         raise SystemExit(1)

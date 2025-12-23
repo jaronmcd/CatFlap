@@ -161,10 +161,12 @@ How CatFlap treats `patable`:
   - For **FSK/GFSK/MSK**, CatFlap fills indices `0..PA_POWER` with the ON value
 - A comma list (up to 8 values) defines an explicit shaping/ramp table
 
----
 
 
----
+For further information, please refer to cc1110-cc1111 data sheet
+- https://www.ti.com/lit/ds/symlink/cc1110-cc1111.pdf
+
+
 
 ## ▶️ Usage
 

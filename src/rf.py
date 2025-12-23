@@ -142,30 +142,87 @@ class Radio:
     # ---------------------------------------------------------------------
     # Optional XDATA access (peek/poke). Used for deterministic FREND0/PATABLE.
     # ---------------------------------------------------------------------
-
     def _xdata_read(self, addr: int, size: int = 1) -> Optional[bytes]:
-        if hasattr(self.d, "peek"):
-            try:
-                b = self.d.peek(addr, size)
-                return bytes(b)
-            except Exception:
-                return None
-        return None
+        """Read CC111x XDATA (best-effort, compatible with Python-2-style rflib).
+
+        Depending on the rflib/RFCat build, peek() may return:
+          - bytes/bytearray
+          - list/tuple of ints
+          - a latin-1 `str` (Python 2 "byte string")
+        """
+        if not hasattr(self.d, "peek"):
+            return None
+
+        try:
+            raw = self.d.peek(addr, size)
+        except Exception:
+            return None
+
+        if raw is None:
+            return None
+        if isinstance(raw, (bytes, bytearray)):
+            return bytes(raw)
+        if isinstance(raw, str):
+            return raw.encode("latin-1", errors="ignore")
+
+        try:
+            return bytes(raw)
+        except Exception:
+            return None
 
     def _xdata_write(self, addr: int, data: bytes) -> bool:
-        if hasattr(self.d, "poke"):
+        """Write CC111x XDATA (best-effort, compatible with Python-2-style rflib).
+
+        Depending on the rflib/RFCat build, poke() may accept:
+          - bytes/bytearray
+          - list[int]
+          - a latin-1 `str` (Python 2 "byte string")
+        """
+        if not hasattr(self.d, "poke"):
+            return False
+
+        candidates = [
+            list(data),  # most portable
+            data,        # ideal if supported
+        ]
+        try:
+            candidates.append(data.decode("latin-1", errors="ignore"))
+        except Exception:
+            pass
+
+        for payload in candidates:
             try:
-                self.d.poke(addr, data)
+                self.d.poke(addr, payload)
                 return True
             except TypeError:
-                try:
-                    self.d.poke(addr, list(data))
-                    return True
-                except Exception:
-                    return False
+                continue
             except Exception:
-                return False
+                continue
+
         return False
+
+    def _dump_power_regs(self, prefix: str = "") -> None:
+        """Log FREND0 + PA_TABLE0..PA_TABLE7 (best-effort)."""
+        try:
+            fr = self._xdata_read(FREND0_ADDR, 1)
+            frend0 = fr[0] if fr else None
+
+            pt: list[Optional[int]] = []
+            for i in range(8):
+                b = self._xdata_read(PA_TABLE0_ADDR - i, 1)
+                pt.append(b[0] if b else None)
+
+            def hx(v: Optional[int]) -> str:
+                return f"0x{v:02X}" if isinstance(v, int) else "None"
+
+            logger.info(
+                f"{prefix}Power regs: FREND0={hx(frend0)} PA_TABLE0..7=["
+                + ", ".join(hx(v) for v in pt)
+                + "]"
+            )
+        except Exception as e:
+            logger.debug(f"Power regs dump failed: {e}")
+
 
     def _write_patable_index(self, index: int, value: int) -> None:
         if index < 0 or index > 7:
@@ -233,6 +290,8 @@ class Radio:
 
             for idx in range(start, pa_power + 1):
                 self._write_patable_index(idx, on_val)
+
+            self._dump_power_regs(prefix="Manual power applied: ") 
             return
 
         if len(pt) > 8:
@@ -240,6 +299,8 @@ class Radio:
 
         for idx, v in enumerate(pt):
             self._write_patable_index(idx, v & 0xFF)
+            
+        self._dump_power_regs(prefix="Manual power applied: ")
 
     def _apply_smart_power(
         self,
