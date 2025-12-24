@@ -27,6 +27,7 @@ ICON_KEYWORDS = [
 ICON_BY_EXTENSION = {
     ".sub": "mdi:remote",
     ".rfcat.json": "mdi:radio-tower",
+    ".py": "mdi:language-python",
 }
 
 def guess_icon_from_text(text: str):

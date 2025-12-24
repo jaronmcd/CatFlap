@@ -326,3 +326,84 @@ Optional RF settings:
   - `/share/.discovery_cache.json`
 
 ---
+
+---
+
+## ▶️ Replay / TX Files (`/share/tx_files`)
+
+CatFlap scans your TX folder and creates **Home Assistant button entities** for supported files. Pressing a button publishes an MQTT message that triggers CatFlap to transmit the matching signal via your RFCat-compatible dongle.
+
+Supported file types:
+
+- **`.sub`** — Flipper Zero RAW replays
+- **`.rfcat.json`** — CatFlap/RFCat JSON replays
+- **`.py`** — **optional** Python TX “macros” (disabled by default)
+
+### Folder layout
+
+You can organize files into subfolders. Each subfolder becomes its own “device” in Home Assistant:
+
+```
+/share/tx_files/
+  garage/
+    open.sub
+    close.rfcat.json
+  lights/
+    porch.sub
+```
+
+### Optional: Python TX scripts (`*.py`)
+
+You can create a `.py` file to run multi-step sequences (macros), delays, or conditional logic.
+
+⚠️ **Security note:** Python scripts run with the add-on’s permissions. For safety, CatFlap **does not expose `.py` buttons unless you explicitly enable them.**
+
+#### Enable `.py` scripts
+
+In the add-on config:
+
+- `allow_python_scripts: true`
+- `python_timeout_s: 30` (script execution timeout)
+
+Example:
+
+```yaml
+allow_python_scripts: true
+python_timeout_s: 30
+```
+
+#### Script conventions
+
+A TX script can work in any of these ways:
+
+1) **Define `run(ctx)` or `main(ctx)`** (recommended):
+
+```python
+def run(ctx):
+    ctx.tx_file("open.rfcat.json", repeat=3)
+    ctx.sleep(0.25)
+    ctx.tx_file("open.rfcat.json", repeat=3)
+```
+
+2) **Export `TX = {...}` or `TX = [{...}, {...}]`**  
+Each dict is passed to the transmitter (and merged with your global RF power settings):
+
+```python
+TX = [
+    {"freq": 433920000, "payload_hex": "A1B2C3D4", "repeat": 5},
+    {"freq": 433920000, "payload_hex": "A1B2C3D5", "repeat": 2}
+]
+```
+
+3) **Use `ctx` helpers directly** (no `run()` needed)  
+A global `ctx` is available while the script runs.
+
+#### `ctx` helper API
+
+- `ctx.log("message")`
+- `ctx.sleep(seconds)`
+- `ctx.tx_file("relative/or/absolute/path.sub", repeat=3, ...)`
+- `ctx.tx_hex(freq_hz, "A1B2C3...", repeat=3, ...)`
+- `ctx.tx_b64(freq_hz, "base64...", repeat=3, ...)`
+
+Paths in `ctx.tx_file()` are relative to the script’s folder, so you can build macros next to the files they replay.

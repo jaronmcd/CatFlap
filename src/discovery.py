@@ -8,6 +8,7 @@ logger = logging.getLogger("Discovery")
 SUPPORTED_EXTENSIONS = (
     ".sub",
     ".rfcat.json",
+    ".py",
 )
 
 DEFAULT_ENTITY_ICON = "mdi:radio-tower"
@@ -50,6 +51,7 @@ ICON_KEYWORDS = [
 ICON_BY_EXTENSION = {
     ".sub": "mdi:remote",
     ".rfcat.json": "mdi:radio-tower",
+    ".py": "mdi:language-python",
 }
 
 
@@ -213,6 +215,12 @@ def run_discovery(client, config):
     files_cfg = config.get("files", {}) or {}
     dev_cfg = config.get("device_info", {}) or {}
 
+    # Only expose *.py scripts as buttons when explicitly enabled.
+    allow_py = bool(files_cfg.get("allow_python_scripts", False))
+    supported_exts = SUPPORTED_EXTENSIONS if allow_py else tuple(
+        e for e in SUPPORTED_EXTENSIONS if e != ".py"
+    )
+
     sub_dir = files_cfg["sub_directory"]
     node_id = files_cfg.get("node_id", "rfcat_replay")
     prefix = files_cfg.get("discovery_prefix", "homeassistant")
@@ -273,7 +281,7 @@ def run_discovery(client, config):
 
     # Scan Files
     for root, dirs, files in os.walk(sub_dir):
-        supported_files = [f for f in files if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+        supported_files = [f for f in files if f.lower().endswith(supported_exts)]
         if not supported_files:
             continue
 

@@ -2,7 +2,7 @@ name: "CatFlap"
 version: "0.9.7-alpha"
 slug: "catflap"
 description: >-
-  Replay Flipper Zero .sub (RAW) and .rfcat.json captures as Home Assistant MQTT buttons,
+  Replay Flipper Zero .sub (RAW), .rfcat.json, and optional .py scripts as Home Assistant MQTT buttons,
   transmitting via an RFCat-compatible CC1111 dongle (Yard Stick One, etc.).
 url: "https://github.com/jaronmcd/CatFlap"
 
@@ -29,6 +29,11 @@ options:
 
   node_id: "catflap"
   sub_directory: "/share/tx_files"
+
+  # Optional: allow running user-provided Python scripts (*.py) from sub_directory.
+  # WARNING: scripts run with the add-on's permissions.
+  allow_python_scripts: false
+  python_timeout_s: 30
 
   # -----------------------------
   # TX power (simple / recommended)
@@ -62,6 +67,9 @@ schema:
 
   node_id: str
   sub_directory: str
+
+  allow_python_scripts: bool?
+  python_timeout_s: int?
 
   # Dropdowns (much more intuitive)
   tx_power_mode: list(smart|max|default|manual)

@@ -15,6 +15,9 @@ import builtins
 import os
 import re
 import time
+import runpy
+import signal
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -202,6 +205,163 @@ class AppState:
     radio: Optional[Any]
 
 
+def _apply_rf_defaults(tx: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge global RF config into a tx_request dict."""
+    rf_cfg = cfg.get("rf", {}) or {}
+    out = dict(tx)
+    out.setdefault("tx_power_mode", rf_cfg.get("tx_power_mode", "smart"))
+    out.setdefault("tx_power_target_dbm", rf_cfg.get("tx_power_target_dbm", 0))
+    out.setdefault("tx_power_band", rf_cfg.get("tx_power_band", "auto"))
+    out.setdefault("frend0_pa_power", rf_cfg.get("frend0_pa_power"))
+    out.setdefault("frend0_lodiv_buf_current_tx", rf_cfg.get("frend0_lodiv_buf_current_tx"))
+    out.setdefault("patable", rf_cfg.get("patable"))
+    return out
+
+
+class TxScriptContext:
+    """Helpers exposed to user *.py tx scripts."""
+
+    def __init__(self, *, radio: Any, cfg: Dict[str, Any], script_path: str):
+        self.radio = radio
+        self.config = cfg
+        self.script_path = script_path
+        self.script_dir = os.path.dirname(os.path.abspath(script_path))
+
+    def log(self, msg: str) -> None:
+        print(f"[Py] {msg}")
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(float(seconds))
+
+    def transmit(self, **tx: Any) -> None:
+        """Low-level transmit helper (accepts rf.Radio.transmit kwargs)."""
+        if "freq" not in tx or "payload" not in tx:
+            raise ValueError("transmit() requires freq=<hz> and payload=<bytes>")
+        merged = _apply_rf_defaults(tx, self.config)
+        self.radio.transmit(**merged)
+
+    def tx_hex(self, freq_hz: int, payload_hex: str, **opts: Any) -> None:
+        s = (payload_hex or "").strip()
+        if s.lower().startswith("0x"):
+            s = s[2:]
+        s = re.sub(r"[^0-9a-fA-F]", "", s)
+        if len(s) % 2:
+            s = "0" + s
+        payload = bytes.fromhex(s)
+        self.transmit(freq=int(freq_hz), payload=payload, **opts)
+
+    def tx_b64(self, freq_hz: int, payload_b64: str, **opts: Any) -> None:
+        import base64
+
+        payload = base64.b64decode((payload_b64 or "").encode("ascii"))
+        self.transmit(freq=int(freq_hz), payload=payload, **opts)
+
+    def tx_file(self, rel_or_abs_path: str, **overrides: Any) -> None:
+        """Replay a .sub or .rfcat.json from within a script."""
+        p = rel_or_abs_path
+        if not os.path.isabs(p):
+            p = os.path.join(self.script_dir, p)
+        tx = get_tx_request(p)
+        tx.update(overrides)
+        tx = _apply_rf_defaults(tx, self.config)
+        self.radio.transmit(**tx)
+
+
+def _coerce_tx_list(obj: Any) -> Optional[list[dict]]:
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return [obj]
+    if isinstance(obj, (list, tuple)):
+        out: list[dict] = []
+        for item in obj:
+            if not isinstance(item, dict):
+                raise ValueError("TX list items must be dicts")
+            out.append(item)
+        return out
+    return None
+
+
+def _execute_python_tx_script(path: str, state: AppState) -> None:
+    files_cfg = state.config.get("files", {}) or {}
+    allow = bool(files_cfg.get("allow_python_scripts", False))
+    if not allow:
+        print("[Py] ERROR: Python scripts are disabled. Set files.allow_python_scripts=true to enable.")
+        return
+    if not state.radio:
+        print("[Py] ERROR: RF device not initialized")
+        return
+
+    timeout_s_raw = files_cfg.get("python_timeout_s", 30)
+    try:
+        timeout_s = int(timeout_s_raw)
+    except Exception:
+        timeout_s = 30
+    if timeout_s < 1:
+        timeout_s = 1
+
+    ctx = TxScriptContext(radio=state.radio, cfg=state.config, script_path=path)
+
+    # Run in the script's folder so relative paths work.
+    cwd = os.getcwd()
+    old_handler = None
+
+    def _timeout_handler(signum, frame):  # pragma: no cover
+        raise TimeoutError(f"TX script timed out after {timeout_s}s")
+
+    try:
+        os.chdir(ctx.script_dir)
+
+        # Best-effort timeout (Unix only).
+        if hasattr(signal, "SIGALRM"):
+            old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(timeout_s)
+
+        # Load the script without executing __main__ blocks.
+        env = runpy.run_path(
+            path,
+            init_globals={"ctx": ctx},
+            run_name="__tx_script__",
+        )
+
+        # Convention 1: run(ctx) or main(ctx)
+        fn = env.get("run") or env.get("main")
+        if callable(fn):
+            fn(ctx)
+            return
+
+        # Convention 2: TX = {...} or TX = [{...}, {...}]
+        tx_list = _coerce_tx_list(env.get("TX"))
+        if tx_list is None and callable(env.get("get_tx_requests")):
+            tx_list = _coerce_tx_list(env["get_tx_requests"]())
+
+        if tx_list:
+            for i, tx in enumerate(tx_list, start=1):
+                merged = _apply_rf_defaults(tx, state.config)
+                print(f"[Py] TX {i}/{len(tx_list)}")
+                state.radio.transmit(**merged)
+            return
+
+        # Otherwise: assume the script used ctx.tx_* helpers directly.
+        print("[Py] Script executed (no TX object detected)")
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[Py] ERROR executing {os.path.basename(path)}: {e}\n{tb}")
+    finally:
+        try:
+            if hasattr(signal, "SIGALRM"):
+                signal.alarm(0)
+                if old_handler is not None:
+                    signal.signal(signal.SIGALRM, old_handler)
+        except Exception:
+            pass
+        try:
+            os.chdir(cwd)
+        except Exception:
+            pass
+
+
 def _make_client() -> mqtt.Client:
     # Support both paho-mqtt v1 and v2 callback API.
     if hasattr(mqtt, "CallbackAPIVersion"):
@@ -256,6 +416,13 @@ def _on_message_factory(state: AppState):
             return
 
         print(f"[MQTT] Trigger: {topic}")
+
+        # Special case: execute user-provided TX scripts (optional).
+        if str(file_path).lower().endswith(".py"):
+            print(f"[Py] Running {os.path.basename(file_path)}")
+            _execute_python_tx_script(file_path, state)
+            return
+
         try:
             tx = get_tx_request(file_path)
         except Exception as e:
@@ -268,19 +435,8 @@ def _on_message_factory(state: AppState):
 
         try:
             print(f"[RfCat] Replaying {os.path.basename(file_path)}")
-            rf_cfg = state.config.get("rf", {})
-
-            # New human-friendly TX power config
-            tx["tx_power_mode"] = rf_cfg.get("tx_power_mode", "smart")
-            tx["tx_power_target_dbm"] = rf_cfg.get("tx_power_target_dbm", 0)
-            tx["tx_power_band"] = rf_cfg.get("tx_power_band", "auto")
-
-            # Advanced/manual escape hatches
-            tx["frend0_pa_power"] = rf_cfg.get("frend0_pa_power")
-            tx["frend0_lodiv_buf_current_tx"] = rf_cfg.get("frend0_lodiv_buf_current_tx")
-            tx["patable"] = rf_cfg.get("patable")
-
-            state.radio.transmit(**tx)
+            merged = _apply_rf_defaults(tx, state.config)
+            state.radio.transmit(**merged)
             print("[RfCat] Transmission complete")
         except Exception as e:
             print(f"[RfCat] ERROR during transmission: {e}")

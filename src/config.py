@@ -45,4 +45,9 @@ def load_config() -> Dict[str, Any]:
     if isinstance(raw_sub, str) and raw_sub and not raw_sub.startswith("/"):
         files["sub_directory"] = os.path.join(base_dir, raw_sub)
 
+    # Optional: allow running user-provided Python scripts from tx_files.
+    # Disabled by default for safety.
+    files.setdefault("allow_python_scripts", False)
+    files.setdefault("python_timeout_s", 30)
+
     return config

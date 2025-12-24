@@ -16,6 +16,11 @@ TX_POWER_MODE="smart"
 TX_POWER_TARGET_DBM="0"
 TX_POWER_BAND="auto"
 
+# Optional: allow running user-provided Python scripts from tx_files.
+# Disabled by default.
+ALLOW_PY_SCRIPTS="false"
+PY_TIMEOUT_S="30"
+
 # Advanced/manual (optional)
 FREND0_PA_POWER=""
 FREND0_LODIV_BUF_CURRENT_TX=""
@@ -27,6 +32,13 @@ if bashio::config.has_value 'discovery_prefix'; then
 fi
 if bashio::config.has_value 'log_level'; then
   LOG_LEVEL="$(bashio::config 'log_level')"
+fi
+
+if bashio::config.has_value 'allow_python_scripts'; then
+  ALLOW_PY_SCRIPTS="$(bashio::config 'allow_python_scripts')"
+fi
+if bashio::config.has_value 'python_timeout_s'; then
+  PY_TIMEOUT_S="$(bashio::config 'python_timeout_s')"
 fi
 
 if bashio::config.has_value 'tx_power_mode'; then
@@ -62,6 +74,7 @@ bashio::log.info "MQTT: ${MQTT_HOST}:${MQTT_PORT} (user: ${MQTT_USER:-none})"
 bashio::log.info "Node ID: ${NODE_ID}"
 bashio::log.info "TX directory: ${SUB_DIR}"
 bashio::log.info "TX power: mode=${TX_POWER_MODE}, target=${TX_POWER_TARGET_DBM}dBm, band=${TX_POWER_BAND}"
+bashio::log.info "Python scripts: ${ALLOW_PY_SCRIPTS} (timeout: ${PY_TIMEOUT_S}s)"
 
 # JSON-safe optional values
 PA_POWER_JSON="null"
@@ -88,7 +101,9 @@ cat > /app/src/config.json <<EOF
   "files": {
     "sub_directory": "${SUB_DIR}",
     "node_id": "${NODE_ID}",
-    "discovery_prefix": "${PREFIX}"
+    "discovery_prefix": "${PREFIX}",
+    "allow_python_scripts": ${ALLOW_PY_SCRIPTS},
+    "python_timeout_s": ${PY_TIMEOUT_S}
   },
   "device_info": {
     "hub_name": "CatFlap",

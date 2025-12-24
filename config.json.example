@@ -8,7 +8,9 @@
   "files": {
     "sub_directory": "../tx_files",
     "node_id": "catflap",
-    "discovery_prefix": "homeassistant"
+    "discovery_prefix": "homeassistant",
+    "allow_python_scripts": false,
+    "python_timeout_s": 30
   },
   "device_info": {
     "hub_name": "CatFlap",
